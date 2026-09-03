@@ -15,6 +15,6 @@ count_missed_cleavage_string <- function(seq){
   
   internal_trypsin_site_regex <- "(?<=[KR])(?!P).(?<!^)"
   
-  count <- str_count(string = seq, pattern = internal_trypsin_site_regex)
+  count <- stringr::str_count(string = seq, pattern = internal_trypsin_site_regex)
   return(count)
 }
