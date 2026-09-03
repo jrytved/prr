@@ -366,6 +366,51 @@ add_missed_cleavage_column <- function(parquet){
 
 }
 
+#'Summarize a parquet report into key summary statistics
+#' 
+#' @param parquet a DIA-NN output .parquet report
+#' @param group.id The upper level grouping column (str) [Experimental group]
+#' @param replicate.id The lower level grouping column (str) [Technical replicate ID]
+#' @return A summarized dataframe with columns: group.id, replicate.id, Protein.Groups, Precursors, Peptides, Missed.Cleavage.Rate
+#' @export
+parquet_summarize_ids_cleavage <- function(parquet, group.id, replicate.id){
+  
+  o <- parquet %>%
+    add_missed_cleavage_column()%>%
+    group_by(!! sym(group.id), !! sym(replicate.id))%>%
+    summarize(
+      
+      Protein.Groups = n_distinct(
+        Protein.Group[
+          Q.Value <= 0.01 &
+          PG.Q.Value <= 0.05 &
+          Lib.Q.Value <= 0.01 &
+          Lib.PG.Q.Value <= 0.05
+        ]
+      ),
+      
+      Precursors = n_distinct(
+        Precursor.Id[
+          Q.Value <= 0.01 &
+          Lib.Q.Value <= 0.01
+        ]
+      ),
+      
+      Peptides = n_distinct(
+        Stripped.Sequence[
+          Q.Value <= 0.01 &
+            Lib.Q.Value <= 0.01
+        ]
+      ),
+      
+      Missed.Cleavage.Rate = n_distinct(Stripped.Sequence[Missed.Cleavages > 0]) / n_distinct(Stripped.Sequence),
+      .groups="drop"
+    )
+  
+  return(o)
+  
+}
+
 
 #' @export
 remove_crap <- function(df){
