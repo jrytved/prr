@@ -1,0 +1,15 @@
+Package: prr
+Title: Proteomics in R. My utility functions for processing and analyzing proteomics data (mainly DIA-NN outputs).
+Version: 0.0.0.1
+Authors@R: 
+    person("J.", "Rytved", , "johan.rytved@sund.ku.dk", role = c("aut", "cre"))
+Description: .
+License: `use_mit_license()`, `use_gpl3_license()` or friends to pick a
+    license
+Encoding: UTF-8
+Roxygen: list(markdown = TRUE)
+Import:
+	tidyverse,
+	arrow
+Config/roxygen2/version: 8.0.0
+RoxygenNote: 7.3.2
