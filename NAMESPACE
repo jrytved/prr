@@ -3,6 +3,7 @@
 export(compute_jaccard_index)
 export(compute_pg_cv)
 export(compute_precursor_cv)
+export(count_missed_cleavage_string)
 export(extract_run_id)
 export(flip_xlab)
 export(force_proteotypic)

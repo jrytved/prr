@@ -1,3 +1,4 @@
+
 #' Read Parquet Files from Multiple Directories
 #'
 #' Given a list of directories, finds the \code{report.parquet} file in each,
