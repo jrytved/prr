@@ -4,17 +4,15 @@
 \alias{parquet_summarize_ids_cleavage}
 \title{Summarize a parquet report into key summary statistics}
 \usage{
-parquet_summarize_ids_cleavage(parquet, group.id, replicate.id)
+parquet_summarize_ids_cleavage(parquet, groups)
 }
 \arguments{
 \item{parquet}{a DIA-NN output .parquet report}
 
-\item{group.id}{The upper level grouping column (str) \link{Experimental group}}
-
-\item{replicate.id}{The lower level grouping column (str) \link{Technical replicate ID}}
+\item{groups}{A vector of columns to group the summary by. Could be c("Sample.ID", "Replicate.ID")}
 }
 \value{
-A summarized dataframe with columns: group.id, replicate.id, Protein.Groups, Precursors, Peptides, Missed.Cleavage.Rate
+A summarized dataframe with columns: *groups, Protein.Groups, Precursors, Peptides, Missed.Cleavage.Rate
 }
 \description{
 Summarize a parquet report into key summary statistics
