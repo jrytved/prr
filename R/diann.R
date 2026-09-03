@@ -369,15 +369,14 @@ add_missed_cleavage_column <- function(parquet){
 #'Summarize a parquet report into key summary statistics
 #' 
 #' @param parquet a DIA-NN output .parquet report
-#' @param group.id The upper level grouping column (str) [Experimental group]
-#' @param replicate.id The lower level grouping column (str) [Technical replicate ID]
-#' @return A summarized dataframe with columns: group.id, replicate.id, Protein.Groups, Precursors, Peptides, Missed.Cleavage.Rate
+#' @param groups A vector of columns to group the summary by. Could be c("Sample.ID", "Replicate.ID")
+#' @return A summarized dataframe with columns: *groups, Protein.Groups, Precursors, Peptides, Missed.Cleavage.Rate
 #' @export
-parquet_summarize_ids_cleavage <- function(parquet, group.id, replicate.id){
+parquet_summarize_ids_cleavage <- function(parquet, groups){
   
   o <- parquet %>%
     add_missed_cleavage_column()%>%
-    group_by(!! sym(group.id), !! sym(replicate.id))%>%
+    group_by(!!!syms(groups))%>%
     summarize(
       
       Protein.Groups = n_distinct(
