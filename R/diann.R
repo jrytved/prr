@@ -349,6 +349,24 @@ compute_pg_cv <- function(data, meta, condition_col, replicate_col, n_min=3, thr
   
 }
 
+#' Add a column 'Missed.Cleavages' with integer number of missed cleavages
+#'
+#' The calculation is based on internal R/K not suffixed by P. The calculation defaults to use the 'Stripped.Sequence' column of the .parquet report passed
+#' @param parquet A DIA-NN outputted .parquet report
+#' @return A parquet report with an added column 'Missed.Cleavages'
+#' @examples
+#' \dontrun{p <- add_missed_cleavage_column(parquet)}
+#' @export
+add_missed_cleavage_column <- function(parquet){
+
+  p <- parquet %>%
+    mutate(Missed.Cleavages = count_missed_cleavage_string(Stripped.Sequence))
+
+  return(p)
+
+}
+
+
 #' @export
 remove_crap <- function(df){
   df %>%
