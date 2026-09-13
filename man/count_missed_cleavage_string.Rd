@@ -17,5 +17,4 @@ Counts the number of internal R/K not suffixed by proline in an AA-string
 }
 \examples{
 count_missed_cleavage_string("AAAALLLRE")
-
 }

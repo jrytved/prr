@@ -2,12 +2,16 @@
 % Please edit documentation in R/setops.R
 \name{compute_jaccard_index}
 \alias{compute_jaccard_index}
-\title{Compute Jaccard Index
-Given a named list of sets, returns a matrix with the Jaccard indices of each pairwise intersection / union.}
+\title{Compute Jaccard Index}
 \usage{
 compute_jaccard_index(named.setlist)
 }
+\arguments{
+\item{named.setlist}{A named list of sets (proteins, peptides, african frog species...)}
+}
+\value{
+A matrix of pairwise jaccard indices
+}
 \description{
-Compute Jaccard Index
 Given a named list of sets, returns a matrix with the Jaccard indices of each pairwise intersection / union.
 }

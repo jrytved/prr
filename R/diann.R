@@ -40,7 +40,7 @@ read_parquet_pathlist <- function(dirlist){
 
 read_parquet_sitereport_pathlist <- function(dirlist){
   
-  # Given a list of directories, finds the report.parquet in each, reads it
+  # Given a list of directories, finds the report.sitre_report.parquet in each, reads it
   # and joins them all together.
   
   paths <- lapply(dirlist, list.files, pattern="^report\\.site_report\\.parquet$", full.names=T)
@@ -58,296 +58,108 @@ read_parquet_sitereport_pathlist <- function(dirlist){
 
 
 
-#' Extract Run ID from a DIA-NN Report
+#' Extract sample ID and technical ID from a parquet report
+#' @description 
+#' Apply a regex pattern containing two groups to the 'Run' column of a .parquet report
+#' to extract a sample id and a replicate id.
 #'
-#' Applies a regular expression to the \code{Run} column of a DIA-NN parquet
-#' report, extracts the specified capture group, and stores the result in a new
-#' \code{uid} column.
-#'
-#' @param report A data frame containing at minimum a \code{Run} column, as
-#'   produced by \code{read_parquet_pathlist}.
-#' @param re A regular expression string containing at least one capture group.
-#' @param g An integer indicating which capture group to extract.
-#'
-#' @return The input data frame with an additional \code{uid} column containing
-#'   the extracted values.
-#'
+#' @param t A tibble with a DIA-NN parquet report
+#' @param patter A regex pattern with exactly two groups, the first being the sample id and the second being the replicate id.
+#' @returns An altered tibble which contains two new columns, Sample.ID and Replicate.ID
 #' @examples
-#' \dontrun{
-#' report <- extract_run_id(report, re = "sample_(\\d+)_", g = 1)
-#' }
-#'
-#' @importFrom dplyr mutate
-#' @importFrom stringr str_extract
+#' tibble %>% extract_sample_ids(., pattern="P167_R2011_X3961_[A-Z][0-9]+_S([A-Z])([0-9])")
+#' 
 #' @export
-extract_run_id <- function(report, re, g){
+extract_sample_ids <- function(t, pattern){
   
-  # Given a DIA-NN parquet report and a re-pattern, maps the pattern over the Run
-  # column, extracts the given group and adds it to a new 'uid'-column.
-  report%>%mutate(uid = str_extract(Run, pattern=re, group=g))
-  
-}
-
-
-
-#' Plot Identification Counts Across Conditions
-#'
-#' Joins a DIA-NN report with sample metadata, computes per-replicate
-#' identification counts at the protein group, precursor, peptide, and
-#' peptidoform levels, and returns a faceted bar chart with per-condition means,
-#' individual replicate jitter points, and CV annotations.
-#'
-#' @param df A data frame containing DIA-NN output columns including
-#'   \code{Protein.Group}, \code{Precursor.Id}, \code{Stripped.Sequence},
-#'   \code{Modified.Sequence}, \code{Lib.PG.Q.Value}, \code{Lib.Q.Value}, and
-#'   \code{Lib.Peptidoform.Q.Value}.
-#' @param meta A data frame of sample metadata to join onto \code{df}. Must
-#'   contain columns matching \code{condition_col} and \code{replicate_col}.
-#' @param condition_col A string specifying the column name in \code{meta} that
-#'   identifies the experimental condition. Defaults to \code{"Condition"}.
-#' @param replicate_col A string specifying the column name in \code{meta} that
-#'   identifies the replicate. Defaults to \code{"Replicate"}.
-#'
-#' @return A \code{ggplot} object with one facet per identification level
-#'   (\code{N.Protein.Groups}, \code{N.Precursors}, \code{N.Peptide},
-#'   \code{N.Peptidoform}), bars representing condition means, jittered points
-#'   for individual replicates, and text labels showing the coefficient of
-#'   variation.
-#'
-#' @examples
-#' \dontrun{
-#' p <- plot_identifications(report, meta, condition_col = "Condition", replicate_col = "Replicate")
-#' print(p)
-#' }
-#'
-#' @importFrom dplyr left_join group_by summarise n_distinct across all_of
-#' @importFrom tidyr pivot_longer
-#' @importFrom ggplot2 ggplot aes geom_bar facet_wrap scale_fill_brewer
-#'   theme_minimal theme element_text geom_jitter geom_text
-#' @importFrom RColorBrewer brewer.pal
-#' @export
-plot_identifications <- function(df, meta, condition_col = "Condition", replicate_col = "Replicate") {
-  
-  df.joined <- df %>% left_join(meta)
-  
-  summarise_measures <- function(df){
-    df %>% summarise(
-      N.Protein.Groups = n_distinct(Protein.Group[Lib.PG.Q.Value <= 0.01]),
-      N.Precursors = n_distinct(Precursor.Id[Lib.Q.Value <= 0.01]),
-      N.Peptide = n_distinct(Stripped.Sequence[Lib.Peptidoform.Q.Value <= 0.01]),
-      N.Peptidoform = n_distinct(Modified.Sequence[Lib.Peptidoform.Q.Value <= 0.01]),
-      .groups = "drop"
-    )
-  }
-  
-  condition_replicate_summarised <- df.joined %>% 
-    group_by(across(all_of(c(condition_col, replicate_col)))) %>%
-    summarise_measures() %>%
-    pivot_longer(-all_of(c(condition_col, replicate_col)), 
-                 names_to = "Level", values_to = "Value")
-  
-  condition_summarised <- condition_replicate_summarised %>%
-    group_by(across(all_of(c(condition_col, "Level")))) %>%
-    summarise(Mean = mean(Value), .groups = "drop")
-  
-  condition_var_summarised <- condition_replicate_summarised %>%
-    group_by(across(all_of(c(condition_col, "Level")))) %>%
-    summarise(
-      CV = sd(Value) / mean(Value),
-      Mean = mean(Value),
-      .groups = "drop"
+  r <- t %>%
+    mutate(
+      Sample.ID = str_extract(Run, pattern, group = 1),
+      Replicate.ID = str_extract(Run, pattern, group = 2)
     )
   
-  p <- ggplot(condition_summarised, aes(x = .data[[condition_col]], y = Mean)) +
-    geom_bar(stat = "identity", color = "black", aes(fill = Level)) +
-    facet_wrap(~Level, scales = "free_y") +
-    scale_fill_brewer(palette = "GnBu") +
-    theme_minimal() +
-    theme(axis.text.x = element_text(angle = -90)) +
-    geom_jitter(condition_replicate_summarised, 
-                mapping = aes(x = .data[[condition_col]], y = Value), 
-                width = 0.1) +
-    geom_text(condition_var_summarised,
-              mapping = aes(x = .data[[condition_col]], y = Mean + 0.1 * Mean, 
-                           label = sprintf("CV=%.1f%%", CV * 100)))
+  stopifnot(!any(is.na(report$Sample.ID)))
+  stopifnot(!any(is.na(report$Replicate.ID)))
   
-  return(p)
+  return(r)
+  
 }
 
+#'Summarize parquet report to protein groups and their intensities
+#'@param t A tibble with a DIA-NN output parquet report
+#'@param groups A character vector of columns to group the proteins by
+#'@param log2.transform Return protein intensities (i) as log2(i+1)
+#'@examples
+#'tibble %>% summarize_to_pogs(groups=c("Sample.ID", "Replicate.ID"))
+#'@returns A summarized report with proteins and their intensities grouped by the 'groups' parameter. 
+#'@export
 
-#' Summarise Identification Counts Across Conditions
-#'
-#' Joins a DIA-NN report with sample metadata and computes identification counts
-#' at the protein group, precursor, peptide, and peptidoform levels, returning
-#' either replicate-level or condition-level summaries.
-#'
-#' @param df A data frame containing DIA-NN output columns including
-#'   \code{Protein.Group}, \code{Precursor.Id}, \code{Stripped.Sequence},
-#'   \code{Modified.Sequence}, \code{Lib.PG.Q.Value}, \code{Lib.Q.Value}, and
-#'   \code{Lib.Peptidoform.Q.Value}.
-#' @param meta A data frame of sample metadata to join onto \code{df}. Must
-#'   contain columns matching \code{condition_col} and \code{replicate_col}.
-#' @param condition_col A string specifying the column name in \code{meta} that
-#'   identifies the experimental condition. Defaults to \code{"Condition"}.
-#' @param replicate_col A string specifying the column name in \code{meta} that
-#'   identifies the replicate. Defaults to \code{"Replicate"}.
-#' @param get_replicate_level Logical. If \code{TRUE} (default), returns a
-#'   long-format data frame at the replicate level. If \code{FALSE}, returns
-#'   condition-level means.
-#'
-#' @return A long-format data frame with columns for condition, replicate (if
-#'   \code{get_replicate_level = TRUE}), \code{Level} (the identification type),
-#'   and either \code{Value} (replicate-level) or \code{Mean}
-#'   (condition-level).
-#'
-#' @examples
-#' \dontrun{
-#' rep_summary <- summarise_identifications(report, meta)
-#' cond_summary <- summarise_identifications(report, meta, get_replicate_level = FALSE)
-#' }
-#'
-#' @importFrom dplyr left_join group_by summarise n_distinct across all_of
-#' @importFrom tidyr pivot_longer
-#' @export
-summarise_identifications <- function(df, meta, condition_col = "Condition", replicate_col = "Replicate", get_replicate_level = TRUE) {
+summarise_to_pgs <- function(t, groups, log2.transform=TRUE){
   
-  df.joined <- df %>% left_join(meta)
+  all.groups <- c(groups, "Protein.Names", "Protein.Group")
   
-  summarise_measures <- function(df){
-    df %>% summarise(
-      N.Protein.Groups = n_distinct(Protein.Group[Lib.PG.Q.Value <= 0.01]),
-      N.Precursors = n_distinct(Precursor.Id[Lib.Q.Value <= 0.01]),
-      N.Peptide = n_distinct(Stripped.Sequence[Lib.Peptidoform.Q.Value <= 0.01]),
-      N.Peptidoform = n_distinct(Modified.Sequence[Lib.Peptidoform.Q.Value <= 0.01]),
-      .groups = "drop"
-    )
+  r <- t %>%
+    group_by(!!!syms(all.groups))%>%
+    summarise(PG.MaxLFQ = first(PG.MaxLFQ), .groups = "drop")
+  
+  if(log2.transform){
+    r <- r %>%
+      mutate(PG.MaxLFQ = log2(PG.MaxLFQ+1))
   }
   
-  condition_replicate_summarised <- df.joined %>% 
-    group_by(across(all_of(c(condition_col, replicate_col)))) %>%
-    summarise_measures() %>%
-    pivot_longer(-all_of(c(condition_col, replicate_col)), 
-                 names_to = "Level", values_to = "Value")
+  return(r)
   
-  condition_summarised <- condition_replicate_summarised %>%
-    group_by(across(all_of(c(condition_col, "Level")))) %>%
-    summarise(Mean = mean(Value), .groups = "drop")
+}
+
+#'Summarize parquet report to precursors and their intensities
+#'@param t A tibble with a DIA-NN output parquet report
+#'@param groups A character vector of columns to group the proteins by
+#'@param log2.transform Return protein intensities (i) as log2(i+1)
+#'@examples
+#'tibble %>% summarize_to_pogs(groups=c("Sample.ID", "Replicate.ID"))
+#'@returns A summarized report with proteins and their intensities grouped by the 'groups' parameter. 
+#'@export
+
+summarise_to_precursors <- function(t, groups, log2.transform=TRUE){
   
-  if(get_replicate_level){
-    return(condition_replicate_summarised)
-  } else {
-    return(condition_summarised)
+  all.groups <- c(groups, "Protein.Group", "Protein.Names", "Precursor.Id", "Stripped.Sequence", "Modified.Sequence")
+  
+  r <- t %>%
+    group_by(!!!syms(all.groups))%>%
+    summarise(Precursor.Normalised = first(Precursor.Normalised), .groups = "drop")
+  
+  if(log2.transform){
+    r <- r %>%
+      mutate(Precursor.Normalised = log2(Precursor.Normalised+1))
   }
   
+  return(r)
+  
 }
 
-
-#' Compute Precursor-Level Coefficient of Variation
-#'
-#' Joins a DIA-NN report with sample metadata, computes the mean, standard
-#' deviation, and coefficient of variation (CV) of \code{Precursor.Normalised}
-#' intensities per condition and precursor, and flags precursors whose CV falls
-#' at or below a given threshold.
-#'
-#' @param data A data frame containing at minimum \code{Precursor.Id} and
-#'   \code{Precursor.Normalised} columns from a DIA-NN report.
-#' @param meta A data frame of sample metadata to join onto \code{data}. Must
-#'   contain a column matching \code{condition_col}.
-#' @param condition_col A string specifying the column name in \code{meta} that
-#'   identifies the experimental condition.
-#' @param replicate_col A string specifying the column name in \code{meta} that
-#'   identifies the replicate. Passed for consistency but not used directly in
-#'   grouping.
-#' @param n_min Integer. Minimum number of observations required for a
-#'   precursor to be retained. Defaults to \code{3}.
-#' @param threshold Numeric. CV threshold below which a precursor is considered
-#'   low-variability. Defaults to \code{0.2} (20\%).
-#'
-#' @return A data frame with one row per condition–precursor combination
-#'   (filtered to \code{N >= n_min}), containing columns \code{N},
-#'   \code{mean}, \code{sd}, \code{CV}, and \code{LT} (logical; \code{TRUE}
-#'   when \code{CV <= threshold}).
-#'
-#' @examples
-#' \dontrun{
-#' cv <- compute_precursor_cv(report, meta, condition_col = "Condition",
-#'                            replicate_col = "Replicate", n_min = 3, threshold = 0.2)
-#' }
-#'
-#' @importFrom dplyr left_join group_by summarise mutate filter across all_of n
+#' Summarize a DIA-NN parquet report to peptide level using MaxLFQ algorithm
+#' 
+#' @param t A tibble with a DIA-NN parquet report
+#' @param sample.id Name of column containing a sample id
+#' @param replicate.id Name of column containing a replicate id
 #' @export
-compute_precursor_cv <- function(data, meta, condition_col, replicate_col, n_min=3, threshold = 0.2){
+summarise_to_peptides <- function(t, sample.id, replicate.id){
   
-  cv.data <- data %>%
-  left_join(meta)%>%
-  group_by(across(all_of(c(condition_col, "Precursor.Id"))))%>%
-  summarise(
-    N = n(),
-    mean = mean(Precursor.Normalised+0.1),
-    sd = sd(Precursor.Normalised+0.1),
-    .groups="drop"
-  ) %>%
-  mutate(CV = sd/mean)%>%
-  filter(N >= n_min)%>%
-  mutate(LT = CV <= threshold)
-    
-  return(cv.data)
+  temp_tibble <- t %>%
+    mutate(temp_id = paste0(!!sym(sample.id), !!sym(replicate.id)))
+  
+  r <- temp_tibble %>%
+    maxlfq(sample.header="temp_id", group.header="Stripped.Sequence")%>%
+    data.frame()%>%
+    rownames_to_column("Stripped.Sequence")%>%
+    pivot_longer(-Stripped.Sequence,names_to="Temporary.Id", values_to = "Peptide.MaxLFQ")
+  
+  return(r)
+  
   
 }
 
 
-#' Compute Protein Group-Level Coefficient of Variation
-#'
-#' Joins a DIA-NN report with sample metadata, computes the mean, standard
-#' deviation, and coefficient of variation (CV) of \code{PG.MaxLFQ} intensities
-#' per condition and protein group, and flags protein groups whose CV falls at
-#' or below a given threshold.
-#'
-#' @param data A data frame containing at minimum \code{Protein.Group} and
-#'   \code{PG.MaxLFQ} columns from a DIA-NN report.
-#' @param meta A data frame of sample metadata to join onto \code{data}. Must
-#'   contain a column matching \code{condition_col}.
-#' @param condition_col A string specifying the column name in \code{meta} that
-#'   identifies the experimental condition.
-#' @param replicate_col A string specifying the column name in \code{meta} that
-#'   identifies the replicate. Passed for consistency but not used directly in
-#'   grouping.
-#' @param n_min Integer. Minimum number of observations required for a protein
-#'   group to be retained. Defaults to \code{3}.
-#' @param threshold Numeric. CV threshold below which a protein group is
-#'   considered low-variability. Defaults to \code{0.2} (20\%).
-#'
-#' @return A data frame with one row per condition–protein group combination
-#'   (filtered to \code{N >= n_min}), containing columns \code{N},
-#'   \code{mean}, \code{sd}, \code{CV}, and \code{LT} (logical; \code{TRUE}
-#'   when \code{CV <= threshold}).
-#'
-#' @examples
-#' \dontrun{
-#' cv <- compute_pg_cv(report, meta, condition_col = "Condition",
-#'                     replicate_col = "Replicate", n_min = 3, threshold = 0.2)
-#' }
-#'
-#' @importFrom dplyr left_join group_by summarise mutate filter across all_of n
-#' @export
-compute_pg_cv <- function(data, meta, condition_col, replicate_col, n_min=3, threshold = 0.2){
-  
-  cv.data <- data %>%
-  left_join(meta)%>%
-  group_by(across(all_of(c(condition_col, "Protein.Group"))))%>%
-  summarise(
-    N = n(),
-    mean = mean(PG.MaxLFQ+0.1),
-    sd = sd(PG.MaxLFQ+0.1),
-    .groups="drop"
-  ) %>%
-  mutate(CV = sd/mean)%>%
-  filter(N >= n_min)%>%
-  mutate(LT = CV <= threshold)
-    
-  return(cv.data)
-  
-}
 
 #' Add a column 'Missed.Cleavages' with integer number of missed cleavages
 #'
@@ -366,64 +178,4 @@ add_missed_cleavage_column <- function(parquet){
 
 }
 
-#'Summarize a parquet report into key summary statistics
-#' 
-#' @param parquet a DIA-NN output .parquet report
-#' @param groups A vector of columns to group the summary by. Could be c("Sample.ID", "Replicate.ID")
-#' @return A summarized dataframe with columns: *groups, Protein.Groups, Precursors, Peptides, Missed.Cleavage.Rate
-#' @export
-parquet_summarize_ids_cleavage <- function(parquet, groups){
-  
-  o <- parquet %>%
-    add_missed_cleavage_column()%>%
-    group_by(!!!syms(groups))%>%
-    summarize(
-      
-      Protein.Groups = n_distinct(
-        Protein.Group[
-          Q.Value <= 0.01 &
-          PG.Q.Value <= 0.05 &
-          Lib.Q.Value <= 0.01 &
-          Lib.PG.Q.Value <= 0.05
-        ]
-      ),
-      
-      Precursors = n_distinct(
-        Precursor.Id[
-          Q.Value <= 0.01 &
-          Lib.Q.Value <= 0.01
-        ]
-      ),
-      
-      Peptides = n_distinct(
-        Stripped.Sequence[
-          Q.Value <= 0.01 &
-            Lib.Q.Value <= 0.01
-        ]
-      ),
-      
-      Missed.Cleavage.Rate = n_distinct(Stripped.Sequence[Missed.Cleavages > 0]) / n_distinct(Stripped.Sequence),
-      .groups="drop"
-    )
-  
-  return(o)
-  
-}
 
-
-#' @export
-remove_crap <- function(df){
-  df %>%
-    filter(!grepl("cRAP", Protein.Ids))
-}
-
-#' @export
-force_proteotypic <- function(df){
-  df %>%
-    filter(Proteotypic == T)
-}
-
-#' @export
-is_phosphorylated <- function(v){
-  return(grepl("UniMod:21", v))
-}
