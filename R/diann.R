@@ -78,8 +78,8 @@ extract_sample_ids <- function(t, pattern){
       Replicate.ID = str_extract(Run, pattern, group = 2)
     )
 
-  sample.id.missing <- any(is.na(report$Sample.ID))
-  replicate.id.missing <- any(is.na(report$Replicate.ID))
+  sample.id.missing <- any(is.na(r$Sample.ID))
+  replicate.id.missing <- any(is.na(r$Replicate.ID))
 
   if(sample.id.missing || replicate.id.missing){
     print("At least one sample id or replicate id could not be extracted. Double check your data if this is not expected.")
