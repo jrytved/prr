@@ -193,16 +193,10 @@ plot_string_net_simple <- function(table, c="orange", layout="fr"){
 }
 
 
-#'Make a simple network graph with igraph & ggraph
+#' Make a simple network graph with igraph & ggraph
 #' Nodes are highlighted by "color_by" and colors are set by "cmap"
 #' @export
 plot_string_net_highlight <- function(table, meta, color_by, name, cmap, layout="fr"){
-  
-  #' Plot a string network with nodes highlighted by color_by
-  #' col gives a column that is mapped to node fill,
-  #' name becomes the legend name for said measure
-  #' and cmap determines color mapping to variables of said measure.
-  
   g <- igraph::graph_from_data_frame(
   table,
   directed = FALSE,
