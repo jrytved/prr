@@ -183,3 +183,38 @@ add_missed_cleavage_column <- function(parquet){
 }
 
 
+
+#' Filter a DIA-NN report based on a list of pre-defined filters
+#' @param report A DIA-NN report
+#' @param filters a list of filters wrapped in rlang::quos, e.g. rlang::quos(Q.Value <= 0.01)
+#' @return A filtered parquet report
+#' @export
+filter_diann <- function(report, filters,
+                         protein_col   = "Protein.Group",
+                         precursor_col = "Precursor.Id") {
+  message("----------")
+  message("Filtering DIA-NN report!")
+  message("----------")
+
+  count_ids <- function(df) c(
+    proteins   = n_distinct(df[[protein_col]]),
+    precursors = n_distinct(df[[precursor_col]])
+  )
+
+  before <- count_ids(report)
+  message(sprintf("Start: %d proteins, %d precursors",
+                  before["proteins"], before["precursors"]))
+
+  for (f in filters) {
+    report <- filter(report, !!f)
+    after  <- count_ids(report)
+    lost   <- before - after
+    message(sprintf("%-25s -%d proteins, -%d precursors (remaining: %d / %d)",
+                    rlang::quo_text(f), lost["proteins"], lost["precursors"],
+                    after["proteins"], after["precursors"]))
+    before <- after
+  }
+  report
+}
+
+
